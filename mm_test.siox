@@ -1,0 +1,45 @@
+module mm_test;
+
+use std::bits::unsigned;
+use avalon::mm::{AvalonMm, Agent, OKAY};
+
+// A one-register Agent with a read latency of one cycle.
+entity Register { clk: Bit in, bus: AvalonMm<4, 32> Agent }
+impl Register {
+    let value: unsigned[32] = 0;
+    let readdata: unsigned[32] = 0;
+    let valid: Bit = '0';
+    step: process {
+        if clk.rising() {
+            if bus.write {
+                value = bus.writedata;
+            }
+            valid = bus.read;
+            readdata = value;
+        }
+    }
+    bus.readdata = readdata;
+    bus.readdatavalid = valid;
+    bus.waitrequest = '0';
+    bus.response = OKAY;
+}
+
+#[test]
+entity AvalonMmTest {}
+impl AvalonMmTest {
+    let clk: Bit = '0';
+    let bus: AvalonMm<4, 32>;
+    let dut: Register = { .clk = clk, .bus = bus };
+
+    bus.address = 2; bus.byteenable = 0xF; bus.read = '0';
+    bus.write = '1'; bus.writedata = 0x5555_AAAA;
+    await 1ns;
+    assert!(bus.waitrequest == '0', "write accepted");
+    clk = '1'; await 1ns; clk = '0';
+    bus.write = '0'; bus.read = '1';
+    await 1ns;
+    clk = '1'; await 1ns; clk = '0';
+    bus.read = '0';
+    await 1ns;
+    assert!(bus.readdatavalid == '1' and bus.readdata == 0x5555_AAAA, "read returns after one cycle");
+}

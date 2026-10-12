@@ -1,0 +1,38 @@
+module avalon::mm;
+
+// Intel Avalon Memory-Mapped (MNL-AVABUSREF): the Host asserts `read` or
+// `write` and holds it while `waitrequest`; pipelined reads return on
+// `readdatavalid`. `A` is the address width and `D` the data width;
+// `byteenable` carries one bit per data byte. Bursts are left out.
+//
+// The clock and reset stay ordinary ports of the endpoint entities.
+
+use std::bits::unsigned;
+
+pub struct AvalonMm<A: integer, D: integer> {
+    pub address: unsigned[A],
+    pub byteenable: unsigned[D / 8],
+    pub read: Bit,
+    pub write: Bit,
+    pub writedata: unsigned[D],
+    pub readdata: unsigned[D],
+    pub readdatavalid: Bit,
+    pub waitrequest: Bit,
+    pub response: unsigned[2]
+}
+
+pub view Host<A: integer, D: integer> for AvalonMm<A, D> {
+    address out, byteenable out, read out, write out, writedata out,
+    readdata in, readdatavalid in, waitrequest in, response in
+}
+
+pub view Agent<A: integer, D: integer> for AvalonMm<A, D> {
+    address in, byteenable in, read in, write in, writedata in,
+    readdata out, readdatavalid out, waitrequest out, response out
+}
+
+// `response` encodings.
+pub const OKAY: integer = 0;
+pub const RESERVED: integer = 1;
+pub const SLVERR: integer = 2;
+pub const DECODEERROR: integer = 3;

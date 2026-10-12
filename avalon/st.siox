@@ -1,0 +1,26 @@
+module avalon::st;
+
+// Intel Avalon Streaming (MNL-AVABUSREF) with ready latency 0: a transfer
+// happens on each clock where `valid` and `ready` are both high. Packets are
+// framed by `startofpacket` and `endofpacket`. `D` is the data width. The
+// optional `empty`, `channel` and `error` signals are left out.
+//
+// The clock and reset stay ordinary ports of the endpoint entities.
+
+use std::bits::unsigned;
+
+pub struct AvalonSt<D: integer> {
+    pub data: unsigned[D],
+    pub valid: Bit,
+    pub ready: Bit,
+    pub startofpacket: Bit,
+    pub endofpacket: Bit
+}
+
+pub view Source<D: integer> for AvalonSt<D> {
+    data out, valid out, ready in, startofpacket out, endofpacket out
+}
+
+pub view Sink<D: integer> for AvalonSt<D> {
+    data in, valid in, ready out, startofpacket in, endofpacket in
+}
