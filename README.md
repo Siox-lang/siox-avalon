@@ -25,12 +25,18 @@ entity Peripheral { clk: Bit in, bus: AvalonMm<16, 32> Agent }
 
 A parent connects a `Host` and a `Agent` through one `let wire: AvalonMm<16, 32>;`.
 
+## Components
+
+| Entity | What it does |
+|---|---|
+| `avalon::mm::Interconnect<A, D, N, REGION>` | One Host to `N` Agents. Agent `i` owns the `2^REGION` bytes at `i << REGION`; unmapped reads return `DECODEERROR`. Pipelined reads are allowed, but not across Agents while reads are outstanding. |
+
 ## Test
 
-Each `<module>_test.siox` drives a small endpoint from a testbench:
+Each `*_test.siox` drives an endpoint or component from a testbench:
 
 ```bash
 sioxc --std <sioxc>/std --test mm_test.siox -o mm_test && ./mm_test
 ```
 
-Needs a `sioxc` with Siox-lang/sioxc#68: width-parameterised struct ports.
+Needs a `sioxc` with Siox-lang/sioxc#69: arrays of view ports.

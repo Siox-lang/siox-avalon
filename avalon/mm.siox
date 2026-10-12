@@ -36,3 +36,56 @@ pub const OKAY: integer = 0;
 pub const RESERVED: integer = 1;
 pub const SLVERR: integer = 2;
 pub const DECODEERROR: integer = 3;
+
+// One Host to `N` Agents. Agent `i` owns the `2^REGION` bytes at
+// `i << REGION`; a read past the last one returns `DECODEERROR` on the next
+// cycle and a write there is dropped. Read data is routed from the Agent of
+// the latest accepted read, so a Host may pipeline reads but must not switch
+// Agents while reads are outstanding.
+pub entity Interconnect<A: integer, D: integer, N: integer, REGION: integer> {
+    clk: Bit in,
+    up: AvalonMm<A, D> Agent,
+    down: AvalonMm<A, D>[N] Host
+}
+
+impl<A: integer, D: integer, N: integer, REGION: integer> Interconnect<A, D, N, REGION> {
+    let index: unsigned[A];
+    let owner: unsigned[A] = 0;
+    let unmapped_read: Bit = '0';
+    index = up.address >> REGION;
+
+    track: process {
+        if clk.rising() {
+            if up.read and not up.waitrequest {
+                owner = index;
+            }
+            unmapped_read = '0';
+            if index >= N {
+                unmapped_read = up.read;
+            }
+        }
+    }
+
+    for i in 0..N - 1 {
+        down[i].address = up.address;
+        down[i].byteenable = up.byteenable;
+        down[i].writedata = up.writedata;
+        down[i].read = if index == i { up.read } else { '0' };
+        down[i].write = if index == i { up.write } else { '0' };
+    }
+
+    if index < N {
+        up.waitrequest = down[index].waitrequest;
+    } else {
+        up.waitrequest = '0';
+    }
+    if owner < N {
+        up.readdata = down[owner].readdata;
+        up.readdatavalid = down[owner].readdatavalid;
+        up.response = down[owner].response;
+    } else {
+        up.readdata = 0;
+        up.readdatavalid = unmapped_read;
+        up.response = DECODEERROR;
+    }
+}

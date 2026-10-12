@@ -1,0 +1,62 @@
+module mm_interconnect_test;
+
+use std::bits::unsigned;
+use avalon::mm::{AvalonMm, Agent, Interconnect, OKAY, DECODEERROR};
+
+// A one-register Agent with a read latency of one cycle.
+entity Register { clk: Bit in, bus: AvalonMm<8, 32> Agent }
+impl Register {
+    let value: unsigned[32] = 0;
+    let readdata: unsigned[32] = 0;
+    let valid: Bit = '0';
+    step: process {
+        if clk.rising() {
+            if bus.write {
+                value = bus.writedata;
+            }
+            valid = bus.read;
+            readdata = value;
+        }
+    }
+    bus.readdata = readdata;
+    bus.readdatavalid = valid;
+    bus.waitrequest = '0';
+    bus.response = OKAY;
+}
+
+// Two registers behind the interconnect, 16 bytes apart.
+entity System { clk: Bit in, up: AvalonMm<8, 32> Agent }
+impl System {
+    let down: AvalonMm<8, 32>[2];
+    let bus: Interconnect<8, 32, 2, 4> = { .clk = clk, .up = up, .down = down };
+    let r0: Register = { .clk = clk, .bus = down[0] };
+    let r1: Register = { .clk = clk, .bus = down[1] };
+}
+
+#[test]
+entity MmInterconnectTest {}
+impl MmInterconnectTest {
+    let clk: Bit = '0';
+    let bus: AvalonMm<8, 32>;
+    let dut: System = { .clk = clk, .up = bus };
+    bus.byteenable = 0xF; bus.read = '0'; bus.write = '0';
+
+    for k in 0..1 {
+        bus.address = k * 0x10; bus.writedata = 0x700 + k; bus.write = '1';
+        await 1ns; clk = '1'; await 1ns; clk = '0';
+    }
+    bus.write = '0';
+    for k in 0..2 {
+        bus.address = k * 0x10; bus.read = '1';
+        await 1ns; clk = '1'; await 1ns; clk = '0';
+        bus.read = '0';
+        await 1ns;
+        assert!(bus.readdatavalid == '1', "every read returns after one cycle");
+        if k < 2 {
+            assert!(bus.readdata == 0x700 + k and bus.response == OKAY, "each agent holds its own word");
+        } else {
+            assert!(bus.response == DECODEERROR, "an unmapped read errors");
+        }
+        clk = '1'; await 1ns; clk = '0';
+    }
+}
