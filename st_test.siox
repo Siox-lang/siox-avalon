@@ -42,8 +42,8 @@ impl AvalonStTest {
     bus.valid = '1';
     for beat in 0..2 {
         bus.data = beat;
-        bus.startofpacket = if beat == 0 { '1' } else { '0' };
-        bus.endofpacket = if beat == 2 { '1' } else { '0' };
+        bus.startofpacket = Bit(beat == 0);
+        bus.endofpacket = Bit(beat == 2);
         await 1ns;
         clk = '1'; await 1ns; clk = '0';
     }
